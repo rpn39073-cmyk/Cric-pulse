@@ -59,17 +59,53 @@ export default function AdminHub() {
     setLoading(true);
     await supabase.from('match_state').update({ is_locked: true, current_ball_result: selectedResult }).eq('id', 1);
 
-    const { data: bets } = await supabase.from('predictions').select('id, telegram_id, choice, potential_win').eq('status', 'PENDING');
+    const { data: bets } = await supabase.from('predictions').select('id, telegram_id, choice, potential_win, amount').eq('status', 'PENDING');
     if (bets) {
       for (const bet of bets) {
         if (bet.choice === selectedResult) {
-          await supabase.from('predictions').update({ status: 'WON', actual_win: bet.potential_win }).eq('id', bet.id);
+          
+          let payout = bet.potential_win;
+
+          // RULE 1: 12x Only Once for 6 Runs
+          if (bet.choice === '6 Runs') {
+             const { count } = await supabase
+               .from('predictions')
+               .select('*', { count: 'exact', head: true })
+               .eq('telegram_id', bet.telegram_id)
+               .eq('choice', '6 Runs')
+               .eq('status', 'WON');
+               
+             if (count && count > 0) {
+                 payout = 0; // Already won 12x before, deny payout!
+             }
+          }
+
+          await supabase.from('predictions').update({ status: 'WON', actual_win: payout }).eq('id', bet.id);
           const { data: p } = await supabase.from('profiles').select('balance').eq('telegram_id', bet.telegram_id).single();
-          if (p) {
-            await supabase.from('profiles').update({ balance: p.balance + bet.potential_win }).eq('telegram_id', bet.telegram_id);
+          if (p && payout > 0) {
+            await supabase.from('profiles').update({ balance: p.balance + payout }).eq('telegram_id', bet.telegram_id);
           }
         } else {
+          // RULE 2: -12x Penalty ONLY IF they have previously won 6 Runs (The Trap)
           await supabase.from('predictions').update({ status: 'LOST' }).eq('id', bet.id);
+          
+          if (bet.choice === '6 Runs') {
+             const { count } = await supabase
+               .from('predictions')
+               .select('*', { count: 'exact', head: true })
+               .eq('telegram_id', bet.telegram_id)
+               .eq('choice', '6 Runs')
+               .eq('status', 'WON');
+
+             if (count && count > 0) {
+                 const penalty = bet.amount * 12;
+                 const { data: p } = await supabase.from('profiles').select('balance').eq('telegram_id', bet.telegram_id).single();
+                 if (p) {
+                   // Allow balance to go deep into the negative (Debt)
+                   await supabase.from('profiles').update({ balance: p.balance - penalty }).eq('telegram_id', bet.telegram_id);
+                 }
+             }
+          }
         }
       }
     }
