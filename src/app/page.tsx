@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import LiveArena from '@/components/LiveArena';
+import TutorialOverlay from '@/components/TutorialOverlay';
 import WalletManager from '@/components/WalletManager';
 import LiveScoreHeader from '@/components/LiveScoreHeader';
 import { useTelegram } from '@/components/TelegramProvider';
@@ -11,6 +12,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function Home() {
   const { user } = useTelegram();
   const [activeTab, setActiveTab] = useState<'arena' | 'wallet'>('arena');
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  useEffect(() => {
+     if (typeof window !== 'undefined') {
+        const seen = localStorage.getItem('cricpulse_tutorial');
+        if (!seen) setShowTutorial(true);
+     }
+  }, []);
+
+  const completeTutorial = () => {
+     localStorage.setItem('cricpulse_tutorial', 'true');
+     setShowTutorial(false);
+  };
 
   // Loading State while waiting for Telegram SDK injecting user data
   if (!user) {
@@ -88,6 +102,7 @@ export default function Home() {
           </button>
       </div>
 
+      {showTutorial && <TutorialOverlay onComplete={completeTutorial} />}
     </main>
   );
 }
