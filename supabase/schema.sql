@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     username VARCHAR(255),
     first_name VARCHAR(255),
     balance NUMERIC(18, 2) DEFAULT 0.00, -- 'Cric-Credits'
+    security_pin VARCHAR(4) DEFAULT NULL, -- 4-Digit Identity Lock
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

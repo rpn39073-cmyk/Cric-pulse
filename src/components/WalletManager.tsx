@@ -7,6 +7,7 @@ import { Wallet, History, Send, QrCode, TrendingUp, CheckCircle, Clock, ArrowDow
 import { motion, AnimatePresence } from 'framer-motion';
 // @ts-ignore
 import { load } from '@cashfreepayments/cashfree-js';
+import SecurityLockScreen from './SecurityLockScreen';
 
 // Initialize Cashfree
 let cashfree: any;
@@ -21,6 +22,8 @@ export default function WalletManager() {
   const [utr, setUtr] = useState('');
   const [redeemAmount, setRedeemAmount] = useState('');
   const [upiId, setUpiId] = useState('');
+  
+  const [showWithdrawalPin, setShowWithdrawalPin] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -139,13 +142,24 @@ export default function WalletManager() {
      setLoading(false);
   };
 
-  const handleRedeem = async (e: React.FormEvent) => {
+  const handleRedeem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     const reqAmount = parseFloat(redeemAmount);
-    if (!upiId.includes('@') || reqAmount > balance) return setMessage('Error: Invalid Request.');
+    if (!upiId.includes('@') || reqAmount > balance) return setMessage('Error: Invalid Request or Insufficient Balance.');
     
+    // Trigger security lock
+    setShowWithdrawalPin(true);
+  };
+
+  const confirmRedeem = async () => {
+    if (!user) return;
+    setShowWithdrawalPin(false);
+    
+    const reqAmount = parseFloat(redeemAmount);
     setLoading(true);
+    
+    // Deduct balance
     const { error: balErr } = await supabase.from('profiles').update({ balance: balance - reqAmount }).eq('telegram_id', user.id);
     if (balErr) { setLoading(false); return setMessage('Error: Transaction Failed.'); }
 
@@ -162,6 +176,24 @@ export default function WalletManager() {
   };
 
   if (!user) return null;
+
+  if (showWithdrawalPin) {
+     return (
+        <div className="absolute inset-0 z-50">
+           <SecurityLockScreen 
+              telegramId={user.id} 
+              isSetupMode={false} 
+              onUnlock={confirmRedeem}
+           />
+           <button 
+              onClick={() => setShowWithdrawalPin(false)} 
+              className="absolute top-4 left-4 z-[9999] text-white/50 hover:text-white"
+           >
+              Cancel
+           </button>
+        </div>
+     );
+  }
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-sm mx-auto">
