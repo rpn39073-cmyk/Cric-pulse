@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS match_state (
     id INT PRIMARY KEY DEFAULT 1, -- Singleton pattern
     is_locked BOOLEAN DEFAULT FALSE,
     current_ball_result VARCHAR(50),
+    market_opened_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

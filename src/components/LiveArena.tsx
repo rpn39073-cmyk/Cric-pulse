@@ -19,7 +19,10 @@ const PREDICTIONS = [
 
 export default function LiveArena() {
   const { user, balance, refreshBalance } = useTelegram();
-  const [isLocked, setIsLocked] = useState(false);
+  const [isLocked, setIsLocked] = useState(true);
+  const [openedAt, setOpenedAt] = useState<string | null>(null);
+  const [timeLocked, setTimeLocked] = useState(false); // 30s auto kill-switch
+
   const [selectedOpt, setSelectedOpt] = useState<typeof PREDICTIONS[0] | null>(null);
   const [amount, setAmount] = useState('100');
   const [loading, setLoading] = useState(false);
@@ -29,7 +32,10 @@ export default function LiveArena() {
   useEffect(() => {
     const fetchState = async () => {
        const { data } = await supabase.from('match_state').select('*').eq('id', 1).single();
-       if (data) setIsLocked(data.is_locked);
+       if (data) {
+           setIsLocked(data.is_locked);
+           setOpenedAt(data.market_opened_at);
+       }
     };
     fetchState();
 
@@ -39,6 +45,7 @@ export default function LiveArena() {
           { event: 'UPDATE', schema: 'public', table: 'match_state' },
           (payload) => {
              setIsLocked(payload.new.is_locked);
+             setOpenedAt(payload.new.market_opened_at);
              // If unlocked, it means a ball was settled. Refresh balance to reflect winnings!
              if (!payload.new.is_locked) {
                 refreshBalance();
@@ -50,8 +57,36 @@ export default function LiveArena() {
     return () => { supabase.removeChannel(channel); };
   }, [refreshBalance]);
 
+  // 30-Second Auto Kill-Switch Timer
+  useEffect(() => {
+     if (isLocked || !openedAt) {
+         setTimeLocked(false);
+         return;
+     }
+
+     const intervalId = setInterval(() => {
+         const elapsed = Date.now() - new Date(openedAt).getTime();
+         if (elapsed >= 30000) {
+             setTimeLocked(true); // Engages the local lockdown visually!
+         } else {
+             setTimeLocked(false);
+         }
+     }, 200); // Check every 200ms
+
+     return () => clearInterval(intervalId);
+  }, [isLocked, openedAt]);
+
+  const effectiveLocked = isLocked || timeLocked;
+
   const handlePredict = async () => {
     if (!user || !selectedOpt || loading) return;
+    
+    // Safety auto-kill check
+    if (effectiveLocked) {
+        setMessage("Market Phase Concluded.");
+        return;
+    }
+
     const numAmt = parseFloat(amount);
     if (isNaN(numAmt) || numAmt <= 0) {
        setMessage("Invalid amount"); return;
@@ -99,19 +134,19 @@ export default function LiveArena() {
     <div className="relative w-full">
        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-             <div className={`w-2 h-2 rounded-full ${isLocked ? 'bg-red-500 animate-pulse' : 'bg-emerald animate-pulse shadow-[0_0_10px_#00FF41]'}`}></div>
+             <div className={`w-2 h-2 rounded-full ${effectiveLocked ? 'bg-red-500 animate-pulse' : 'bg-emerald animate-pulse shadow-[0_0_10px_#00FF41]'}`}></div>
              <p className="font-mono text-[10px] uppercase font-bold tracking-widest text-metallic">
-                {isLocked ? 'MARKET LOCKED' : 'MARKET OPEN'}
+                {effectiveLocked ? (timeLocked && !isLocked ? 'AUTO-LOCKED (30S)' : 'MARKET LOCKED') : 'MARKET OPEN'}
              </p>
           </div>
           <div className="bg-white/5 border border-white/10 px-3 py-1 rounded-md flex items-center gap-2">
-             <Cpu size={12} className="text-emerald" />
+             <Cpu size={12} className={effectiveLocked ? "text-red-500" : "text-emerald"} />
              <span className="text-[10px] font-mono tracking-widest text-white/80">LATENCY: 12ms</span>
           </div>
        </div>
 
        {/* Safe Lock Overlay */}
-       <div className={`transition-all duration-500 relative ${isLocked ? 'blur-md scale-[0.98] opacity-80 pointer-events-none' : ''}`}>
+       <div className={`transition-all duration-500 relative ${effectiveLocked ? 'blur-md scale-[0.98] opacity-80 pointer-events-none' : ''}`}>
           <div className="grid grid-cols-2 gap-3 mb-6">
              {PREDICTIONS.map((opt) => (
                 <button
@@ -132,7 +167,7 @@ export default function LiveArena() {
           </div>
 
           <AnimatePresence>
-            {selectedOpt && !isLocked && (
+            {selectedOpt && !effectiveLocked && (
                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                   <div className="glass-panel p-5 border-emerald/20">
                      <div className="flex justify-between items-center mb-4">
@@ -161,7 +196,7 @@ export default function LiveArena() {
 
        {/* Locked Message Overlay */}
        <AnimatePresence>
-         {isLocked && (
+         {effectiveLocked && (
             <motion.div 
                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
                className="absolute inset-0 z-50 flex items-center justify-center"
@@ -170,7 +205,9 @@ export default function LiveArena() {
                   <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4 animate-pulse">
                      <ShieldAlert size={32} className="text-red-500" />
                   </div>
-                  <h3 className="text-xl font-black italic tracking-tight text-white uppercase">2-Ball Safety Lock</h3>
+                  <h3 className="text-xl font-black italic tracking-tight text-white uppercase">
+                     {timeLocked && !isLocked ? '30S TIMEOUT' : '2-Ball Safety Lock'}
+                  </h3>
                   <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-red-400 mt-2">Prediction Engine Offline</p>
                   <p className="text-xs text-metallic mt-2 max-w-[200px]">Node is synchronizing live field data. Please wait for the next delivery.</p>
                </div>

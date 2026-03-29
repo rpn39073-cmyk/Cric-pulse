@@ -5,15 +5,22 @@ import { supabase } from '@/lib/supabase';
 import { Activity, ShieldCheck } from 'lucide-react';
 
 export default function LiveScoreHeader() {
-  // Using Mock Data for the prototype. This will be replaced by a Real-time Cricket API later.
   const [matchData, setMatchData] = useState({
     teamA: 'IND', teamB: 'AUS', score: '0/0', overs: '0.0', target: '---', status: 'Waiting for feed...'
   });
 
+  const [isLocked, setIsLocked] = useState(true);
+  const [openedAt, setOpenedAt] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+
   useEffect(() => {
     const fetchScore = async () => {
-       const { data } = await supabase.from('match_state').select('live_score').eq('id', 1).single();
-       if (data && data.live_score) setMatchData(data.live_score);
+       const { data } = await supabase.from('match_state').select('*').eq('id', 1).single();
+       if (data) {
+           if (data.live_score) setMatchData(data.live_score);
+           setIsLocked(data.is_locked);
+           if (data.market_opened_at) setOpenedAt(data.market_opened_at);
+       }
     };
     fetchScore();
 
@@ -22,6 +29,8 @@ export default function LiveScoreHeader() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'match_state' },
           (payload) => {
              if (payload.new.live_score) setMatchData(payload.new.live_score);
+             setIsLocked(payload.new.is_locked);
+             setOpenedAt(payload.new.market_opened_at);
           }
       )
       .subscribe();
@@ -29,16 +38,55 @@ export default function LiveScoreHeader() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // 30 Seconds Synchronized Countdown Engine
+  useEffect(() => {
+     if (isLocked || !openedAt) {
+         setProgress(0);
+         return;
+     }
+
+     const intervalId = setInterval(() => {
+         const now = Date.now();
+         const start = new Date(openedAt).getTime();
+         const elapsed = now - start;
+         
+         const maxDurationMs = 30000; // Exact 30 seconds
+         let pct = (elapsed / maxDurationMs) * 100;
+         
+         if (pct >= 100) {
+             pct = 100;
+             clearInterval(intervalId); // Stop ticking once it hits 100%
+         }
+         
+         setProgress(pct);
+     }, 100); // 100ms smoothness tick
+
+     return () => clearInterval(intervalId);
+  }, [isLocked, openedAt]);
+
   return (
-    <div className="w-full bg-black/60 border-b border-white/5 backdrop-blur-3xl sticky top-0 z-50">
+    <div className="w-full bg-black/60 border-b border-white/5 backdrop-blur-3xl sticky top-0 z-50 overflow-hidden">
+      
+      {/* 30 SECOND PROGRESS BAR */}
+      <div 
+         className={`absolute top-0 left-0 h-1 bg-emerald shadow-[0_0_15px_#00FF41] z-50 ${progress < 100 ? 'transition-all duration-100 ease-linear' : ''}`}
+         style={{ width: `${progress}%`, opacity: progress > 0 ? 1 : 0 }}
+      />
+
       {/* Top micro-header */}
-      <div className="flex justify-between items-center px-4 py-1.5 bg-emerald/10 border-b border-emerald/20">
+      <div className="flex justify-between items-center px-4 py-1.5 bg-emerald/10 border-b border-emerald/20 mt-[2px]">
          <span className="text-[9px] font-bold tracking-[0.3em] uppercase text-emerald flex items-center gap-1">
             <Activity size={10} className="animate-pulse" /> Live Telemetry
          </span>
-         <span className="text-[9px] font-mono font-bold text-metallic uppercase flex items-center gap-1">
-            <ShieldCheck size={10} /> Encrypted Feed
-         </span>
+         {(progress >= 100 && !isLocked) ? (
+            <span className="text-[9px] font-mono font-black text-red-500 uppercase flex items-center gap-1 animate-pulse">
+               Closing Market...
+            </span>
+         ) : (
+            <span className="text-[9px] font-mono font-bold text-metallic uppercase flex items-center gap-1">
+               <ShieldCheck size={10} /> Encrypted Feed
+            </span>
+         )}
       </div>
 
       {/* Main Scoreboard Area */}

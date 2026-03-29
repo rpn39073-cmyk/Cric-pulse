@@ -54,7 +54,13 @@ export default function AdminHub() {
 
   const setMarketLock = async (locked: boolean) => {
     setLoading(true);
-    await supabase.from('match_state').update({ is_locked: locked }).eq('id', 1);
+    const updateData: any = { is_locked: locked };
+    if (!locked) {
+       updateData.market_opened_at = new Date().toISOString();
+    } else {
+       updateData.market_opened_at = null;
+    }
+    await supabase.from('match_state').update(updateData).eq('id', 1);
     await fetchData();
     setLoading(false);
   };
