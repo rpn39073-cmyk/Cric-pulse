@@ -5,6 +5,7 @@ import { useTelegram } from './TelegramProvider';
 import { supabase } from '@/lib/supabase';
 import { Wallet, History, Send, QrCode, TrendingUp, CheckCircle, Clock, ArrowDownToLine, ArrowUpFromLine, SmartphoneNfc } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+// @ts-ignore
 import { load } from '@cashfreepayments/cashfree-js';
 
 // Initialize Cashfree
