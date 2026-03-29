@@ -34,20 +34,20 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   
   // Security States
   const [needsLogin, setNeedsLogin] = useState(false);
-  const [hasPin, setHasPin] = useState<boolean | null>(null);
-  const [pinVerified, setPinVerified] = useState(false);
+  const [hasMobile, setHasMobile] = useState<boolean | null>(null);
+  const [pinVerified, setPinVerified] = useState(false); // Keeps logic same, just verifies Mobile+Pass
 
   const fetchProfileData = async (telegramId: number) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('balance, security_pin')
+        .select('balance, mobile_number')
         .eq('telegram_id', telegramId)
         .single();
       
       if (!error && data) {
         setBalance(data.balance);
-        setHasPin(data.security_pin !== null);
+        setHasMobile(data.mobile_number !== null);
       }
     } catch (e) {
       console.error("Error fetching profile:", e);
@@ -110,10 +110,10 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   }
 
   // If user exists, but PIN logic is pending, block the screen with Security Lock
-  if (user && !pinVerified && hasPin !== null) {
+  if (user && !pinVerified && hasMobile !== null) {
       return <SecurityLockScreen 
           telegramId={user.id} 
-          isSetupMode={!hasPin} 
+          isSetupMode={!hasMobile} 
           onUnlock={() => setPinVerified(true)} 
       />;
   }
