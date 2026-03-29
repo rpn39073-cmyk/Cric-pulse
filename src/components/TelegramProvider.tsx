@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import LoginGateway from '@/components/LoginGateway';
 import SecurityLockScreen from '@/components/SecurityLockScreen';
@@ -28,6 +29,8 @@ const TelegramContext = createContext<TelegramContextValue>({
 });
 
 export function TelegramProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  
   const [user, setUser] = useState<TelegramUser | null>(null);
   const [balance, setBalance] = useState<number>(0);
   const [webApp, setWebApp] = useState<any>(null);
@@ -100,6 +103,10 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
        clearTimeout(timeout);
     };
   }, []);
+
+  if (pathname?.startsWith('/admin-x')) {
+      return <>{children}</>;
+  }
 
   if (needsLogin) {
      return <LoginGateway onSuccess={async (u) => {
