@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --color-obsidian: #050505;
+  --color-emerald: #00FF41;
+  --color-metallic: #9CA3AF; /* gray-400 equivalent for silver metallic */
+}
+
+@layer base {
+  :root {
+    --background: var(--color-obsidian);
+    --foreground: #ffffff;
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), sans-serif;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent; /* Remove tap highlight for mobile native feel */
+}
+
+/* Glassmorphism & Premium UI Utilities */
+@layer components {
+  .glass-panel {
+    @apply bg-white/[0.02] backdrop-blur-[24px] border border-white/10 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.5)];
+  }
+
+  /* 1px Titanium Border Effect */
+  .titanium-border {
+    @apply border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)];
+  }
+  
+  /* Hides scrollbar but allows scrolling */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+}
